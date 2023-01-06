@@ -1,4 +1,5 @@
 include <gridfinity-rebuilt-utility.scad>
+include <gridfinity-battery-constants.scad>
 
 // ===== INFORMATION ===== //
 /*
@@ -37,10 +38,17 @@ gridz = 3;
 // base unit
 length = 42;
 
+/* [Battery] */
+// Select which kind of cell type you want to be able to store in your gridfinity box
+battery_type = 1; //[0: AAA, 1: AA, 2: C, 3: D]
+
+// Modifies the diameter of the battery. If you want a tight fit, make the number smaller
 battery_wiggleroom = 0.01;
-battery_diameter = 14.5 + battery_wiggleroom;
-battery_length = 50.5;
-battery_z_offset = 1;
+
+// How high up from the floor you want the model. 0 would be flush with the bottom of the base
+battery_z_offset = 0;
+
+// How much extra space to insert between batteries
 battery_spacing = 0.1;
 
 /* [Compartments] */
@@ -77,6 +85,9 @@ div_base_y = 0;
 
 // ===== IMPLEMENTATION ===== //
 
+battery_diameter = battery_data[battery_type][0] + battery_wiggleroom;
+battery_length = battery_data[battery_type][1];
+
 battery_radius = (battery_diameter / 2);
 battery_z = h_base + battery_z_offset;
 
@@ -84,39 +95,34 @@ function batteryPos(index, grid_size) = (index * (battery_diameter + battery_spa
 function batteryX(column) = batteryPos(column, gridx);
 function batteryY(row) = batteryPos(row, gridy);
 
+// Calculate the maximum number of batteries that can be stored in a row or column based on the configuration of the box
 function maxBatteries(grid_size) = floor((length * grid_size) / (battery_diameter + battery_spacing));
-function batteryLineWidth(maxInLine) = (maxInLine * (battery_diameter + battery_spacing)) - battery_spacing;
-//function batteryLineAdjustment(lineWidth, grid_size) = (((grid_size*length) - lineWidth) / 2) + ((grid_size*length )/ 2);
-function emptySpace(lineWidth, grid_size) = (grid_size*length) - lineWidth;
-function batteryLineAdjustment(lineWidth, grid_size) = -((grid_size*length) / 2) + battery_radius + (emptySpace(lineWidth, grid_size)/2);
 
-test = ((gridx*length) / 2);
-echo("test", test);
+// The length in mm of a row or column of batteries
+function batteryLineWidth(quantity) = (quantity * (battery_diameter + battery_spacing)) - battery_spacing;
+
+// The amount of space not occupied by batteries
+function emptySpace(lineWidth, grid_size) = (grid_size * length) - lineWidth;
+
+// The offset that should be applied to each battery so that the "grid" of batteries is propery centred
+function batteryLineAdjustment(lineWidth, grid_size) = -((grid_size * length) / 2) + battery_radius + (emptySpace(lineWidth, grid_size)/2);
 
 max_batteries_x = maxBatteries(gridx);
 max_batteries_y = maxBatteries(gridy);
-echo("max_batteries_x", max_batteries_x);
 
 battery_x_line_width = batteryLineWidth(max_batteries_x);
 battery_y_line_width = batteryLineWidth(max_batteries_y);
-echo("battery_x_line_width", battery_x_line_width);
-
-empty_space_x = emptySpace(battery_x_line_width, gridx);
-echo("empty_space_x", empty_space_x);
 
 battery_x_adjustment = batteryLineAdjustment(battery_x_line_width, gridx);
 battery_y_adjustment = batteryLineAdjustment(battery_y_line_width, gridy);
-echo("battery_x_adjustment", battery_x_adjustment);
-echo("battery_y_adjustment", battery_y_adjustment);
 
 color("tomato") {
 difference() {
     gridfinityInit(gridx, gridy, height(gridz, gridz_define, enable_lip, enable_zsnap), height_internal, length);
     
     for(x = [0:max_batteries_x - 1]) {
-        echo("x", x);
         for(y = [0:max_batteries_y - 1]) {
-            translate([batteryX(x) + battery_x_adjustment,batteryY(y) + battery_y_adjustment,battery_z])
+            translate([batteryX(x) + battery_x_adjustment, batteryY(y) + battery_y_adjustment, battery_z])
             cylinder(battery_length, battery_radius, battery_radius);
         }
     }   
@@ -124,80 +130,3 @@ difference() {
 gridfinityBase(gridx, gridy, length, div_base_x, div_base_y, style_hole);
 
 }
-
-
-// ===== EXAMPLES ===== //
-
-// 3x3 even spaced grid
-/*
-gridfinityInit(3, 3, height(6), 0, 42) {
-	cutEqual(n_divx = 3, n_divy = 3, style_tab = 0, enable_scoop = true);
-}
-gridfinityBase(3, 3, 42, 0, 0, 1);
-*/
-
-// Compartments can be placed anywhere (this includes non-integer positions like 1/2 or 1/3). The grid is defined as (0,0) being the bottom left corner of the bin, with each unit being 1 base long. Each cut() module is a compartment, with the first four values defining the area that should be made into a compartment (X coord, Y coord, width, and height). These values should all be positive. t is the tab style of the compartment (0:full, 1:auto, 2:left, 3:center, 4:right, 5:none). s is a toggle for the bottom scoop. 
-/*
-gridfinityInit(3, 3, height(6), 0, 42) {
-    cut(x=0, y=0, w=1.5, h=0.5, t=5, s=false);
-    cut(0, 0.5, 1.5, 0.5, 5, false);
-    cut(0, 1, 1.5, 0.5, 5, false);
-    
-    cut(0,1.5,0.5,1.5,5,false);
-    cut(0.5,1.5,0.5,1.5,5,false);
-    cut(1,1.5,0.5,1.5,5,false);
-    
-    cut(1.5, 0, 1.5, 5/3, 2);
-    cut(1.5, 5/3, 1.5, 4/3, 4);
-}
-gridfinityBase(3, 3, 42, 0, 0, 1);
-*/
-
-// Compartments can overlap! This allows for weirdly shaped compartments, such as this "2" bin. 
-/*
-gridfinityInit(3, 3, height(6), 0, 42)  {
-    cut(0,2,2,1,5,false);
-    cut(1,0,1,3,5);
-    cut(1,0,2,1,5);
-    cut(0,0,1,2);
-    cut(2,1,1,2);
-}
-gridfinityBase(3, 3, 42, 0, 0, 1);
-*/
-
-// Areas without a compartment are solid material, where you can put your own cutout shapes. using the cut_move() function, you can select an area, and any child shapes will be moved from the origin to the center of that area, and subtracted from the block. For example, a pattern of three cylinderical holes.
-/*
-gridfinityInit(3, 3, height(6), 0, 42) {
-    cut(x=0, y=0, w=2, h=3);
-    cut(x=0, y=0, w=3, h=1, t=5);
-    cut_move(x=2, y=1, w=1, h=2) 
-        pattern_linear(x=1, y=3, sx=42/2) 
-            cylinder(r=5, h=1000, center=true);
-}
-gridfinityBase(3, 3, 42, 0, 0, 1);
-*/
-
-// You can use loops as well as the bin dimensions to make different parametric functions, such as this one, which divides the box into columns, with a small 1x1 top compartment and a long vertical compartment below
-/*
-gx = 3;
-gy = 3;
-gridfinityInit(gx, gy, height(6), 0, 42) {
-    for(i=[0:gx-1]) {
-        cut(i,0,1,gx-1);
-        cut(i,gx-1,1,1);
-    }
-}
-gridfinityBase(gx, gy, 42, 0, 0, 1);
-*/
-
-// Pyramid scheme bin
-/*
-gx = 4.5;
-gy = 4;
-gridfinityInit(gx, gy, height(6), 0, 42) {
-    for (i = [0:gx-1]) 
-    for (j = [0:i])
-    cut(j*gx/(i+1),gy-i-1,gx/(i+1),1,0);
-}
-gridfinityBase(gx, gy, 42, 0, 0, 1);
-*/
