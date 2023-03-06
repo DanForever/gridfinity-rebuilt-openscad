@@ -8,3 +8,7 @@ battery_data =
     [ 26.2, 50 ], // C
     [ 34.2, 61.5 ], // D
 ];
+
+ninevolt_battery_width = 26.5;
+ninevolt_battery_depth = 17.5;
+ninevolt_battery_height = 48.5;
